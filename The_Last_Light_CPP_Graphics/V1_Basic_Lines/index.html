@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Last Light — V1: Basic Lines (Interactive Web Player)</title>
+<style>
+  body {
+    background: #0d0f18;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 { margin-bottom: 6px; color: #64c8ff; }
+  p.subtitle { margin-top: 0; color: #888; font-size: 14px; }
+  .canvas-container {
+    box-shadow: 0 8px 30px rgba(0,0,0,0.8);
+    border: 2px solid #3c3750;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  canvas { display: block; background: #000; }
+  .controls-bar {
+    margin-top: 14px;
+    display: flex;
+    gap: 12px;
+  }
+  button {
+    background: #232738;
+    color: #fff;
+    border: 1px solid #50c878;
+    padding: 8px 18px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  button:hover {
+    background: #50c878;
+    color: #000;
+  }
+  .info-card {
+    margin-top: 18px;
+    background: #141724;
+    border: 1px solid #282d42;
+    border-radius: 6px;
+    padding: 12px 20px;
+    width: 860px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+  }
+  .tag-dda { color: #50c878; font-weight: bold; }
+  .tag-bres { color: #c89650; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>The Last Light — Version 1: Basic Lines</h1>
+<p class="subtitle">Direct geometric implementation of DDA & Bresenham Line Drawing Algorithms</p>
+
+<div class="canvas-container">
+  <canvas id="gameCanvas" width="900" height="620"></canvas>
+</div>
+
+<div class="controls-bar">
+  <button onclick="setScene(0)">1. Lumen Village</button>
+  <button onclick="setScene(1)">2. Dark Forest</button>
+  <button onclick="setScene(2)">3. Abandoned Shrine</button>
+  <button onclick="nextScene()">Next Scene (Space / Enter)</button>
+</div>
+
+<div class="info-card">
+  <div><span class="tag-dda">[DDA LINE]</span> Houses, Roads, Boundaries, Octagons, Planks, Beams</div>
+  <div><span class="tag-bres">[BRESENHAM LINE]</span> Roofs, Trees, Bridge Rails, Shrine Walls, Guardian</div>
+  <div>Press <b>SPACE</b> or <b>ENTER</b> to cycle scenes</div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const WIN_W = 900, WIN_H = 620, HUD_H = 50, LEGEND = 160;
+const PF_X1 = 0, PF_Y1 = HUD_H, PF_X2 = WIN_W - LEGEND, PF_Y2 = WIN_H;
+
+// Colors
+const COL_BG_VILLAGE = 'rgb(30, 50, 20)';
+const COL_BG_FOREST  = 'rgb(10, 30, 10)';
+const COL_BG_SHRINE  = 'rgb(30, 25, 35)';
+const COL_HUD        = 'rgb(15, 15, 25)';
+const COL_LEGEND_BG  = 'rgb(10, 10, 20)';
+const COL_DDA        = 'rgb(80, 200, 120)';
+const COL_BRES       = 'rgb(200, 150, 80)';
+const COL_ROAD       = 'rgb(120, 100, 60)';
+const COL_HOUSE      = 'rgb(160, 80, 40)';
+const COL_ROOF       = 'rgb(180, 60, 40)';
+const COL_CRYSTAL    = 'rgb(100, 200, 255)';
+const COL_PLAYER     = 'rgb(230, 210, 160)';
+const COL_SWORD      = 'rgb(200, 220, 240)';
+const COL_TREE_T     = 'rgb(80, 55, 30)';
+const COL_TREE_L     = 'rgb(30, 100, 30)';
+const COL_BRIDGE     = 'rgb(140, 110, 70)';
+const COL_SHRINE     = 'rgb(130, 120, 140)';
+const COL_GUARDIAN   = 'rgb(160, 40, 40)';
+const COL_SHARD      = 'rgb(255, 240, 100)';
+const COL_BOUNDARY   = 'rgb(60, 55, 80)';
+
+let curColor = '#fff';
+
+function setColor(c) { curColor = c; }
+
+function putPixel(x, y) {
+  if (x >= 0 && x < WIN_W && y >= 0 && y < WIN_H) {
+    ctx.fillStyle = curColor;
+    ctx.fillRect(Math.floor(x), Math.floor(y), 1, 1);
+  }
+}
+
+// 1. DDA Line Drawing Algorithm
+function drawDDA(x1, y1, x2, y2) {
+  let dx = x2 - x1;
+  let dy = y2 - y1;
+  let steps = Math.max(Math.abs(dx), Math.abs(dy));
+  if (steps === 0) { putPixel(x1, y1); return; }
+  let xInc = dx / steps;
+  let yInc = dy / steps;
+  let x = x1, y = y1;
+  for (let i = 0; i <= steps; i++) {
+    putPixel(x + 0.5, y + 0.5);
+    x += xInc;
+    y += yInc;
+  }
+}
+
+// 2. Bresenham Line Drawing Algorithm
+function drawBresenhamLine(x1, y1, x2, y2) {
+  let dx = Math.abs(x2 - x1);
+  let dy = Math.abs(y2 - y1);
+  let sx = (x1 < x2) ? 1 : -1;
+  let sy = (y1 < y2) ? 1 : -1;
+  let err = dx - dy;
+  let cx = x1, cy = y1;
+  while (true) {
+    putPixel(cx, cy);
+    if (cx === x2 && cy === y2) break;
+    let e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; cx += sx; }
+    if (e2 < dx)  { err += dx; cy += sy; }
+  }
+}
+
+function ddaLine(x1, y1, x2, y2, col) { setColor(col); drawDDA(x1, y1, x2, y2); }
+function bresLine(x1, y1, x2, y2, col) { setColor(col); drawBresenhamLine(x1, y1, x2, y2); }
+
+function ddaThick(x1, y1, x2, y2, col, t = 2) {
+  setColor(col);
+  for (let i = -Math.floor(t / 2); i <= Math.floor(t / 2); i++) {
+    let dy = Math.abs(y2 - y1), dx = Math.abs(x2 - x1);
+    if (dx >= dy) drawDDA(x1, y1 + i, x2, y2 + i);
+    else drawDDA(x1 + i, y1, x2 + i, y2);
+  }
+}
+
+function bresThick(x1, y1, x2, y2, col, t = 2) {
+  setColor(col);
+  for (let i = -Math.floor(t / 2); i <= Math.floor(t / 2); i++) {
+    let dy = Math.abs(y2 - y1), dx = Math.abs(x2 - x1);
+    if (dx >= dy) drawBresenhamLine(x1, y1 + i, x2, y2 + i);
+    else drawBresenhamLine(x1 + i, y1, x2 + i, y2);
+  }
+}
+
+function ddaRect(x1, y1, x2, y2, col, t = 1) {
+  ddaThick(x1, y1, x2, y1, col, t);
+  ddaThick(x2, y1, x2, y2, col, t);
+  ddaThick(x2, y2, x1, y2, col, t);
+  ddaThick(x1, y2, x1, y1, col, t);
+}
+
+function bresRect(x1, y1, x2, y2, col, t = 1) {
+  bresThick(x1, y1, x2, y1, col, t);
+  bresThick(x2, y1, x2, y2, col, t);
+  bresThick(x2, y2, x1, y2, col, t);
+  bresThick(x1, y2, x1, y1, col, t);
+}
+
+function clearPlayfield(bgCol) {
+  ctx.fillStyle = bgCol;
+  ctx.fillRect(PF_X1, PF_Y1, PF_X2 - PF_X1, PF_Y2 - PF_Y1);
+}
+
+function drawHUD(scene, num) {
+  ctx.fillStyle = COL_HUD;
+  ctx.fillRect(0, 0, WIN_W, HUD_H);
+  bresLine(0, HUD_H - 1, WIN_W, HUD_H - 1, COL_BOUNDARY);
+
+  ctx.fillStyle = COL_CRYSTAL;
+  ctx.font = 'bold 18px monospace';
+  ctx.fillText('THE LAST LIGHT', 12, 32);
+
+  ctx.fillStyle = COL_DDA;
+  ctx.font = '11px monospace';
+  ctx.fillText('VERSION 1', 220, 20);
+  ctx.fillText('DDA + BRESENHAM LINE', 220, 36);
+
+  ctx.fillStyle = '#fff';
+  ctx.font = '13px monospace';
+  ctx.fillText(`Scene ${num}/3 : ${scene}`, 440, 30);
+
+  ctx.fillStyle = COL_BRES;
+  ctx.font = '11px monospace';
+  ctx.fillText('[SPACE] Next Scene', 660, 20);
+  ctx.fillText('[ESC]   Quit', 660, 36);
+}
+
+function drawLegend() {
+  ctx.fillStyle = COL_LEGEND_BG;
+  ctx.fillRect(PF_X2, HUD_H, WIN_W - PF_X2, WIN_H - HUD_H);
+  bresLine(PF_X2, HUD_H, PF_X2, WIN_H, COL_BOUNDARY);
+
+  let lx = PF_X2 + 8;
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 12px monospace';
+  ctx.fillText('ALGORITHM', lx, HUD_H + 18);
+  ctx.fillText('LEGEND', lx, HUD_H + 32);
+  bresLine(PF_X2, HUD_H + 40, WIN_W, HUD_H + 40, COL_BOUNDARY);
+
+  let y = HUD_H + 58;
+  ctx.fillStyle = COL_DDA;
+  ctx.fillText('[DDA LINE]', lx, y); y += 16;
+  ctx.fillStyle = '#ccc';
+  ctx.font = '11px monospace';
+  ctx.fillText('• Houses', lx, y); y += 14;
+  ctx.fillText('• Roads', lx, y); y += 14;
+  ctx.fillText('• Boundaries', lx, y); y += 14;
+  ctx.fillText('• Player', lx, y); y += 14;
+  ctx.fillText('• Shard', lx, y); y += 22;
+
+  bresLine(PF_X2, y, WIN_W, y, COL_BOUNDARY); y += 14;
+
+  ctx.fillStyle = COL_BRES;
+  ctx.font = 'bold 12px monospace';
+  ctx.fillText('[BRESENHAM]', lx, y); y += 16;
+  ctx.fillStyle = '#ccc';
+  ctx.font = '11px monospace';
+  ctx.fillText('• Trees', lx, y); y += 14;
+  ctx.fillText('• Roofs', lx, y); y += 14;
+  ctx.fillText('• Bridge rails', lx, y); y += 14;
+  ctx.fillText('• Shrine walls', lx, y); y += 14;
+  ctx.fillText('• Guardian', lx, y); y += 14;
+}
+
+function drawHouse(bx, by, w, h, rh) {
+  ddaRect(bx, by - h, bx + w, by, COL_HOUSE, 2);
+  let dx = bx + Math.floor(w / 2) - 6;
+  ddaRect(dx, by - 18, dx + 12, by, COL_BRES, 1);
+  ddaRect(bx + 5, by - h + 8, bx + 5 + 14, by - h + 8 + 12, COL_DDA, 1);
+  let mx = bx + Math.floor(w / 2);
+  let ry = by - h - rh;
+  bresThick(bx, by - h, mx, ry, COL_ROOF, 2);
+  bresThick(bx + w, by - h, mx, ry, COL_ROOF, 2);
+  bresThick(bx, by - h, bx + w, by - h, COL_ROOF, 1);
+}
+
+function drawTree(cx, ty, tw, th, trkH) {
+  let tkx = cx - 4;
+  bresRect(tkx, ty + th, tkx + 8, ty + th + trkH, COL_TREE_T, 2);
+  let top = ty;
+  let left = cx - Math.floor(tw / 2);
+  let right = cx + Math.floor(tw / 2);
+  bresThick(left, ty + th, cx, top, COL_TREE_L, 2);
+  bresThick(right, ty + th, cx, top, COL_TREE_L, 2);
+  bresThick(left, ty + th, right, ty + th, COL_TREE_L, 1);
+}
+
+function drawPlayer(cx, cy) {
+  ddaRect(cx - 8, cy - 20, cx + 8, cy + 10, COL_PLAYER, 2);
+  let r = 10, ox = cx, oy = cy - 30;
+  let pts = [
+    [ox - r, oy - 4], [ox - 4, oy - r], [ox + 4, oy - r], [ox + r, oy - 4],
+    [ox + r, oy + 4], [ox + 4, oy + r], [ox - 4, oy + r], [ox - r, oy + 4]
+  ];
+  for (let i = 0; i < 8; i++) {
+    let nx = (i + 1) % 8;
+    ddaLine(pts[i][0], pts[i][1], pts[nx][0], pts[nx][1], COL_PLAYER);
+  }
+  bresThick(cx + 8, cy - 10, cx + 24, cy - 26, COL_SWORD, 2);
+  ddaLine(cx + 13, cy - 15, cx + 19, cy - 21, COL_SWORD);
+}
+
+function drawCrystal(cx, cy, r) {
+  bresThick(cx, cy - r, cx + r, cy, COL_CRYSTAL, 2);
+  bresThick(cx + r, cy, cx, cy + r, COL_CRYSTAL, 2);
+  bresThick(cx, cy + r, cx - r, cy, COL_CRYSTAL, 2);
+  bresThick(cx - r, cy, cx, cy - r, COL_CRYSTAL, 2);
+  bresLine(cx, cy - r, cx, cy + r, COL_CRYSTAL);
+  bresLine(cx - r, cy, cx + r, cy, COL_CRYSTAL);
+  setColor(COL_DDA);
+  for (let a = 0; a < 360; a += 45) {
+    let rad = a * Math.PI / 180;
+    let ex = cx + Math.floor((r + 10) * Math.cos(rad));
+    let ey = cy + Math.floor((r + 10) * Math.sin(rad));
+    drawDDA(cx, cy, ex, ey);
+  }
+}
+
+function drawBridge(bx, by, bw, bh) {
+  bresThick(bx, by, bx + bw, by, COL_BRIDGE, 3);
+  bresThick(bx, by + bh, bx + bw, by + bh, COL_BRIDGE, 3);
+  for (let x = bx + 6; x < bx + bw; x += 10) {
+    ddaLine(x, by + 2, x, by + bh - 2, COL_BRIDGE);
+  }
+}
+
+function drawVillage() {
+  clearPlayfield(COL_BG_VILLAGE);
+  ddaRect(PF_X1 + 10, PF_Y1 + 10, PF_X2 - 10, PF_Y2 - 10, COL_DDA, 2);
+  ddaThick(PF_X1 + 20, 340, PF_X2 - 20, 340, COL_ROAD, 28);
+  ddaThick(370, PF_Y1 + 20, 370, 340, COL_ROAD, 22);
+
+  drawHouse(60,  320, 80, 70, 30);
+  drawHouse(180, 290, 90, 70, 35);
+  drawHouse(490, 310, 80, 65, 28);
+  drawHouse(590, 320, 85, 70, 32);
+
+  for (let x = PF_X1 + 15; x < PF_X2 - 15; x += 20) {
+    ddaThick(x, PF_Y2 - 22, x, PF_Y2 - 10, COL_BRES, 2);
+  }
+  ddaLine(PF_X1 + 15, PF_Y2 - 18, PF_X2 - 15, PF_Y2 - 18, 'rgb(100, 70, 30)');
+
+  [150, 310, 440, 560].forEach(lx => {
+    bresThick(lx, 280, lx, 340, 'rgb(160, 140, 80)', 2);
+    bresLine(lx - 8, 280, lx + 8, 280, 'rgb(160, 140, 80)');
+    bresLine(lx, 280, lx, 272, 'rgb(200, 190, 100)');
+    setColor('rgb(240, 220, 100)');
+    for (let a = 0; a < 360; a += 60) {
+      let rad = a * Math.PI / 180;
+      drawDDA(lx, 272, lx + Math.floor(8 * Math.cos(rad)), 272 + Math.floor(8 * Math.sin(rad)));
+    }
+  });
+
+  drawCrystal(370, 200, 38);
+  drawTree(120, 140, 50, 50, 20);
+  drawTree(620, 150, 50, 50, 20);
+  drawTree(80, 440, 44, 44, 18);
+  drawTree(640, 450, 44, 44, 18);
+
+  ddaRect(330, PF_Y2 - 48, 415, PF_Y2 - 28, 'rgb(80, 60, 30)', 2);
+  bresThick(370, PF_Y2 - 28, 370, PF_Y2 - 12, 'rgb(140, 110, 70)', 2);
+
+  ddaRect(400, 270, 418, 310, 'rgb(180, 150, 100)', 2);
+  ddaLine(404, 268, 414, 268, 'rgb(200, 170, 120)');
+  ddaLine(409, 260, 409, 268, 'rgb(200, 170, 120)');
+  ddaThick(418, 270, 430, 315, 'rgb(140, 100, 60)', 2);
+  bresLine(426, 270, 434, 270, 'rgb(140, 100, 60)');
+
+  drawPlayer(280, 310);
+
+  ctx.fillStyle = COL_DDA;
+  ctx.font = '11px monospace';
+  ctx.fillText('[DDA] House', 62, 220);
+  ctx.fillText('[DDA] House', 490, 240);
+  ctx.fillText('[DDA] Boundary', 310, 70);
+  ctx.fillStyle = COL_BRES;
+  ctx.fillText('[B] Tree', 80, 100);
+  ctx.fillText('[B] Crystal', 300, 155);
+  ctx.fillText('[B] Lamp', 140, 250);
+}
+
+function drawForest() {
+  clearPlayfield(COL_BG_FOREST);
+  ddaRect(PF_X1 + 10, PF_Y1 + 10, PF_X2 - 10, PF_Y2 - 10, COL_DDA, 2);
+  ddaThick(PF_X1 + 20, 500, 420, 500, COL_ROAD, 22);
+  ddaThick(420, 500, 420, PF_Y1 + 20, COL_ROAD, 22);
+
+  const tx = [60, 130, 220, 310, 510, 570, 620, 670, 50, 100, 200, 650, 700];
+  const ty = [120, 180, 110, 160, 130, 200, 100, 170, 280, 360, 400, 280, 360];
+  const tw = [56, 48, 60, 52, 58, 46, 54, 50, 50, 44, 52, 48, 54];
+  const th = [60, 50, 64, 54, 60, 48, 56, 52, 50, 44, 52, 48, 54];
+  const tt = [24, 20, 26, 22, 24, 20, 22, 22, 20, 18, 22, 20, 22];
+  for (let i = 0; i < 13; i++) drawTree(tx[i], ty[i], tw[i], th[i], tt[i]);
+
+  drawBridge(200, 455, 220, 30);
+  bresThick(PF_X1 + 20, 455, PF_X2 - 20, 455, 'rgb(40, 60, 130)', 3);
+  bresThick(PF_X1 + 20, 487, PF_X2 - 20, 487, 'rgb(40, 60, 130)', 3);
+  for (let y = 458; y < 485; y += 3) ddaLine(PF_X1 + 20, y, PF_X2 - 20, y, 'rgb(30, 50, 110)');
+
+  function drawRock(rx, ry, rs) {
+    let p = [
+      [rx - rs, ry - rs/2], [rx - rs/2, ry - rs], [rx + rs/2, ry - rs], [rx + rs, ry - rs/2],
+      [rx + rs, ry + rs/2], [rx + rs/2, ry + rs], [rx - rs/2, ry + rs], [rx - rs, ry + rs/2]
+    ];
+    for (let i = 0; i < 8; i++) {
+      let n = (i + 1) % 8;
+      ddaLine(p[i][0], p[i][1], p[n][0], p[n][1], 'rgb(100, 90, 90)');
+    }
+  }
+  drawRock(160, 400, 16);
+  drawRock(340, 380, 14);
+  drawRock(520, 430, 18);
+
+  function drawEnemy(ex, ey) {
+    ddaRect(ex - 16, ey - 14, ex + 16, ey + 14, 'rgb(140, 40, 140)', 2);
+    ddaLine(ex - 7, ey - 6, ex - 3, ey - 6, 'rgb(255, 100, 100)');
+    ddaLine(ex + 3, ey - 6, ex + 7, ey - 6, 'rgb(255, 100, 100)');
+    ddaLine(ex - 6, ey + 4, ex + 6, ey + 4, 'rgb(255, 80, 80)');
+  }
+  drawEnemy(140, 300);
+  drawEnemy(350, 310);
+  drawEnemy(500, 320);
+
+  ddaRect(560, 430, 578, 470, 'rgb(80, 80, 160)', 2);
+  ddaLine(565, 428, 573, 428, 'rgb(80, 80, 160)');
+  ddaLine(569, 420, 569, 428, 'rgb(80, 80, 160)');
+  bresThick(560, 430, 554, 470, 'rgb(60, 60, 140)', 2);
+  bresThick(578, 430, 584, 470, 'rgb(60, 60, 140)', 2);
+
+  bresThick(580, 120, 620, 120, 'rgb(200, 200, 80)', 2);
+  bresThick(610, 112, 622, 120, 'rgb(200, 200, 80)', 2);
+  bresThick(610, 128, 622, 120, 'rgb(200, 200, 80)', 2);
+
+  ctx.fillStyle = COL_DDA;
+  ctx.font = '11px monospace';
+  ctx.fillText('[DDA] Path / Boundary', 200, PF_Y1 + 15);
+  ctx.fillText('[DDA] Rock', 140, 380);
+  ctx.fillStyle = COL_BRES;
+  ctx.fillText('[B] Tree', 55, 75);
+  ctx.fillText('[B] Bridge Rails', 200, 438);
+  ctx.fillText('[B] River', 30, 440);
+}
+
+function drawShrine() {
+  clearPlayfield(COL_BG_SHRINE);
+  ddaRect(PF_X1 + 10, PF_Y1 + 10, PF_X2 - 10, PF_Y2 - 10, COL_DDA, 2);
+
+  for (let x = PF_X1 + 30; x < PF_X2 - 20; x += 40) ddaLine(x, PF_Y1 + 20, x, PF_Y2 - 20, 'rgb(50, 45, 60)');
+  for (let y = PF_Y1 + 30; y < PF_Y2 - 20; y += 40) ddaLine(PF_X1 + 20, y, PF_X2 - 20, y, 'rgb(50, 45, 60)');
+
+  bresRect(60, PF_Y1 + 40, PF_X2 - 70, PF_Y2 - 40, COL_SHRINE, 4);
+  bresRect(120, PF_Y1 + 80, PF_X2 - 130, PF_Y2 - 80, COL_SHRINE, 3);
+
+  bresThick(310, PF_Y2 - 80, 310, PF_Y2 - 40, 'rgb(80, 70, 90)', 3);
+  bresThick(430, PF_Y2 - 80, 430, PF_Y2 - 40, 'rgb(80, 70, 90)', 3);
+  bresThick(310, PF_Y2 - 80, 430, PF_Y2 - 80, 'rgb(80, 70, 90)', 3);
+  bresThick(310, PF_Y2 - 80, 370, PF_Y2 - 100, 'rgb(80, 70, 90)', 2);
+  bresThick(430, PF_Y2 - 80, 370, PF_Y2 - 100, 'rgb(80, 70, 90)', 2);
+
+  for (let i = 0; i < 3; i++) {
+    let px = 150 + i * 200;
+    ddaLine(px, PF_Y1 + 100, px, PF_Y1 + 160, COL_DDA);
+    ddaLine(px - 30, PF_Y1 + 130, px + 30, PF_Y1 + 130, COL_DDA);
+  }
+
+  ddaRect(120, PF_Y1 + 80, 160, PF_Y1 + 160, 'rgb(100, 95, 110)', 2);
+  ddaRect(580, PF_Y1 + 80, 620, PF_Y1 + 160, 'rgb(100, 95, 110)', 2);
+  ddaRect(120, PF_Y2 - 160, 160, PF_Y2 - 80, 'rgb(100, 95, 110)', 2);
+  ddaRect(580, PF_Y2 - 160, 620, PF_Y2 - 80, 'rgb(100, 95, 110)', 2);
+
+  let gx = 370, gy = 250;
+  bresRect(gx - 40, gy - 60, gx + 40, gy + 40, COL_GUARDIAN, 3);
+  bresRect(gx - 24, gy - 88, gx + 24, gy - 60, COL_GUARDIAN, 3);
+  bresThick(gx - 24, gy - 88, gx - 34, gy - 110, COL_GUARDIAN, 2);
+  bresThick(gx + 24, gy - 88, gx + 34, gy - 110, COL_GUARDIAN, 2);
+  ddaLine(gx - 15, gy - 78, gx - 7, gy - 78, 'rgb(255, 80, 80)');
+  ddaLine(gx + 7, gy - 78, gx + 15, gy - 78, 'rgb(255, 80, 80)');
+  bresThick(gx - 40, gy - 30, gx - 70, gy, COL_GUARDIAN, 3);
+  bresThick(gx + 40, gy - 30, gx + 70, gy, COL_GUARDIAN, 3);
+  bresThick(gx + 70, gy, gx + 90, gy - 40, 'rgb(180, 100, 100)', 3);
+
+  let sx = 370, sy = 420;
+  setColor(COL_SHARD);
+  for (let a = 0; a < 360; a += 36) {
+    let sr1 = 24, sr2 = 12;
+    let angle1 = a * Math.PI / 180;
+    let angle2 = (a + 18) * Math.PI / 180;
+    let px1 = sx + Math.floor(sr1 * Math.cos(angle1));
+    let py1 = sy + Math.floor(sr1 * Math.sin(angle1));
+    let px2 = sx + Math.floor(sr2 * Math.cos(angle2));
+    let py2 = sy + Math.floor(sr2 * Math.sin(angle2));
+    drawDDA(sx, sy, px1, py1);
+    drawDDA(px1, py1, px2, py2);
+  }
+  bresThick(sx, sy - 24, sx + 16, sy, COL_SHARD, 2);
+  bresThick(sx + 16, sy, sx, sy + 24, COL_SHARD, 2);
+  bresThick(sx, sy + 24, sx - 16, sy, COL_SHARD, 2);
+  bresThick(sx - 16, sy, sx, sy - 24, COL_SHARD, 2);
+
+  ctx.fillStyle = COL_DDA;
+  ctx.font = '11px monospace';
+  ctx.fillText('[DDA] Floor / Boundary', PF_X1 + 15, PF_Y1 + 15);
+  ctx.fillText('[DDA] Columns', 122, PF_Y1 + 84);
+  ctx.fillText('[DDA] Shard', sx - 12, sy + 28);
+  ctx.fillStyle = COL_BRES;
+  ctx.fillText('[B] Shrine Walls', 62, PF_Y1 + 44);
+  ctx.fillText('[B] Guardian', gx - 38, gy - 106);
+}
+
+const scenes = ['Lumen Village', 'Dark Forest', 'Abandoned Shrine'];
+let currentScene = 0;
+
+function render() {
+  ctx.clearRect(0, 0, WIN_W, WIN_H);
+  if (currentScene === 0) drawVillage();
+  else if (currentScene === 1) drawForest();
+  else if (currentScene === 2) drawShrine();
+
+  drawHUD(scenes[currentScene], currentScene + 1);
+  drawLegend();
+}
+
+function setScene(idx) {
+  currentScene = idx;
+  render();
+}
+
+function nextScene() {
+  currentScene = (currentScene + 1) % 3;
+  render();
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.code === 'Enter') {
+    nextScene();
+  }
+});
+
+render();
+</script>
+</body>
+</html>

@@ -1,41 +1,42 @@
 # ============================================================
 #  The Last Light — V1: Basic Lines
-#  Makefile for WinBGIm / MinGW on Windows
-# ============================================================
-#
-#  Adjust LIBPATH and INCPATH to match your WinBGIm install.
-#  The defaults below assume the library lives two levels up
-#  in  ../WinBGIm_Library6_0_Nov2005/
-#
+#  Cross-Platform Makefile (Linux / WSLg & Windows MinGW)
 # ============================================================
 
 CXX      := g++
 CXXFLAGS := -std=c++17 -O2 -Wall -Wno-unused-result
 
-# ── Paths ──────────────────────────────────────────────────
-# Path to the folder containing graphics.h / winbgim.h
-INCPATH  := ../../WinBGIm_Library6_0_Nov2005
+# Detect OS
+ifeq ($(OS),Windows_NT)
+    # Windows MinGW configuration
+    INCPATH := ../../WinBGIm_Library6_0_Nov2005
+    LIBPATH := ../../WinBGIm_Library6_0_Nov2005
+    LDFLAGS := -L$(LIBPATH) -lbgi -lgdi32 -lcomdlg32 -luuid -loleaut32 -lole32
+    TARGET  := game.exe
+    RM_CMD  := del $(TARGET) 2>nul || rm -f $(TARGET)
+else
+    # Linux (X11 / WSLg) configuration
+    INCPATH := .
+    LDFLAGS := -lX11 -lpthread
+    TARGET  := game
+    RM_CMD  := rm -f $(TARGET) game.exe
+endif
 
-# Path to the folder containing libbgi.a
-LIBPATH  := ../../WinBGIm_Library6_0_Nov2005
-
-# ── Linker flags for WinBGIm ───────────────────────────────
-LDFLAGS  := -L$(LIBPATH) -lbgi -lgdi32 -lcomdlg32 -luuid -loleaut32 -lole32
-
-# ── Targets ────────────────────────────────────────────────
-TARGET   := game
 SRC      := main.cpp
 
 # ───────────────────────────────────────────────────────────
 all: $(TARGET)
 
-$(TARGET): $(SRC)
+$(TARGET): $(SRC) graphics.h
 	$(CXX) $(CXXFLAGS) -I. -I$(INCPATH) $(SRC) -o $(TARGET) $(LDFLAGS)
 
 run: all
+	@if [ -z "$$DISPLAY" ] || [ "$$DISPLAY" = ":0" ]; then \
+		if [ -e /tmp/.X11-unix/X1 ]; then export DISPLAY=:1; fi; \
+	fi; \
 	./$(TARGET)
 
 clean:
-	del $(TARGET).exe 2>nul || rm -f $(TARGET)
+	$(RM_CMD)
 
 .PHONY: all run clean
